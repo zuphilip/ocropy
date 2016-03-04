@@ -1,20 +1,11 @@
+Note: The text line recognizer has been ported to C++ and is now a separate project, the CLSTM project, available here: https://github.com/tmbdev/clstm 
+
 ocropy
 ======
 
-Python-based OCR package using recurrent neural networks.
-
-To install, use:
-
-    $ sudo apt-get install $(cat PACKAGES)
-    $ wget -nd http://www.tmbdev.net/en-default.pyrnn.gz
-    $ mv en-default.pyrnn.gz models/
-    $ sudo python setup.py install
-
-To test the recognizer, run:
-
-    $ ./run-test
-
-OCRopus is really a collection of document analysis programs, not a turn-key OCR system.
+OCRopus is a collection of document analysis programs, not a turn-key OCR system.
+In order to apply it to your documents, you may need to do some image preprocessing,
+and possibly also train new models.
 
 In addition to the recognition scripts themselves, there are a number of scripts for
 ground truth editing and correction, measuring error rates, determining confusion matrices, etc.
@@ -22,8 +13,45 @@ OCRopus commands will generally print a stack trace along with an error message;
 this is not generally indicative of a problem (in a future release, we'll suppress the stack
 trace by default since it seems to confuse too many users).
 
+Installing
+----------
+
+[![Join the chat at https://gitter.im/tmbdev/ocropy](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/tmbdev/ocropy?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
+To install OCRopus dependencies system-wide:
+
+    $ sudo apt-get install $(cat PACKAGES)
+    $ wget -nd http://www.tmbdev.net/en-default.pyrnn.gz
+    $ mv en-default.pyrnn.gz models/
+    $ sudo python setup.py install
+
+Alternatively, dependencies can be installed into a [Python Virtual Environment]
+(http://docs.python-guide.org/en/latest/dev/virtualenvs/):
+
+    $ virtualenv ocropus_venv/
+    $ source ocropus_venv/bin/activate
+    $ pip install -r requirements_1.txt
+    # tables has some dependencies which must be installed first:
+    $ pip install -r requirements_2.txt
+    $ wget -nd http://www.tmbdev.net/en-default.pyrnn.gz
+    $ mv en-default.pyrnn.gz models/
+
+To test the recognizer, run:
+
+    $ ./run-test
+    
+Running
+-------
+
 To recognize pages of text, you need to run separate commands: binarization, page layout
-analysis, and text line recognition. 
+analysis, and text line recognition. The default parameters and settings of OCRopus assume
+300dpi binary black-on-white images. If your images are scanned at a different resolution, the
+simplest thing to do is to downscale/upscale them to 300dpi. The text line recognizer is
+fairly robust to different resolutions, but the layout analysis is quite resolution dependent.
+
+Here is an example for a page of Fraktur text (German);
+you need to download the Fraktur model from tmbdev.net/ocropy/fraktur.pyrnn.gz to run this
+example:
 
     # perform binarization
     ./ocropus-nlbin tests/ersch.png -o book
@@ -53,3 +81,60 @@ You can also generate training data using ocropus-linegen:
 
 This will create a directory "linegen/..." containing training data
 suitable for training OCRopus with synthetic data.
+
+## Roadmap
+
+The major change in ocropy wil likely be a refactoring so that there are separate packages for:
+
+ - preprocessing and layout analysis
+ - text line recognition (Python version)
+ - isolated character recognition using local learning
+ - data generation
+ - language modeling
+
+Note that for text line recognition and language modeling, you can also use the CLSTM command line tools. Except for taking different command line options, they are otherwise drop-in replacements for the Python-based text line recognizer.
+
+## Contributing
+
+OCRopy and CLSTM are both command line driven programs. The best way to contribute is to create new command line programs using the same (simple) persistent representations as the rest of OCRopus.
+
+The biggest needs are in the following areas:
+
+ - text/image segmentation
+ - text line detection and extraction
+ - output generation (hOCR and hOCR-to-* transformations)
+
+## CLSTM vs OCRopy
+
+The CLSTM project (https://github.com/tmbdev/clstm) is a replacement for 
+`ocropus-rtrain` and `ocropus-rpred` in C++ (it used to be a subproject of
+`ocropy` but has been moved into a separate project now). It is significantly faster than 
+the Python versions and has minimal library dependencies, so it is suitable 
+for embedding into C++ programs.
+
+Python and C++ models can _not_ be interchanged, both because the save file 
+formats are different and because the text line normalization is slightly 
+different. Error rates are about the same.
+
+In addition, the C++ command line tool (`clstmctc`) has different command line 
+options and currently requiresloading training data into HDF5 files, instead
+of being trained off a list of image files directly (image file-based training
+will be added to `clstmctc` soon).
+
+The CLSTM project also provides LSTM-based language modeling that works very
+well with post-processing and correcting OCR output, as well as solving a number
+of other OCR-related tasks, such as dehyphenation or changes in orthography
+(see our publications). You can train language models using `clstmtext`.
+
+Generally, your best bet for CLSTM and OCRopy is to rely only on the command
+line tools; that makes it easy to replace different components. In addition, you
+should keep your OCR training data in .png/.gt.txt files so that you can easily 
+retrain models as better recognizers become available.
+
+After making CLSTM a full replacement for `ocropus-rtrain`/`ocropus-rpred`, the
+next step will be to replace the binarization, text/image segmentation, and layout 
+analysis in OCRopus with trainable 2D LSTM models.
+
+## Solution for clang
+
+[Read README_OSX.md](README_OSX.md)

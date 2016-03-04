@@ -177,15 +177,15 @@ import PIL
 
 def pil2array(im,alpha=0):
     if im.mode=="L":
-        a = numpy.fromstring(im.tostring(),'B')
+        a = numpy.fromstring(im.tobytes(),'B')
         a.shape = im.size[1],im.size[0]
         return a
     if im.mode=="RGB":
-        a = numpy.fromstring(im.tostring(),'B')
+        a = numpy.fromstring(im.tobytes(),'B')
         a.shape = im.size[1],im.size[0],3
         return a
     if im.mode=="RGBA":
-        a = numpy.fromstring(im.tostring(),'B')
+        a = numpy.fromstring(im.tobytes(),'B')
         a.shape = im.size[1],im.size[0],4
         if not alpha: a = a[:,:,:3]
         return a
@@ -194,9 +194,9 @@ def pil2array(im,alpha=0):
 def array2pil(a):
     if a.dtype==dtype("B"):
         if a.ndim==2:
-            return PIL.Image.fromstring("L",(a.shape[1],a.shape[0]),a.tostring())
+            return PIL.Image.frombytes("L",(a.shape[1],a.shape[0]),a.tostring())
         elif a.ndim==3:
-            return PIL.Image.fromstring("RGB",(a.shape[1],a.shape[0]),a.tostring())
+            return PIL.Image.frombytes("RGB",(a.shape[1],a.shape[0]),a.tostring())
         else:
             raise OcropusException("bad image rank")
     elif a.dtype==dtype('float32'):
@@ -481,7 +481,8 @@ def save_object(fname,obj,zip=0):
     if zip==0 and fname.endswith(".gz"):
         zip = 1
     if zip>0:
-        with gzip.GzipFile(fname,"wb") as stream:
+        # with gzip.GzipFile(fname,"wb") as stream:
+        with os.popen("gzip -9 > '%s'"%fname,"wb") as stream:
             cPickle.dump(obj,stream,2)
     else:
         with open(fname,"wb") as stream:
@@ -501,11 +502,12 @@ def load_object(fname,zip=0,nofind=0,verbose=0):
     if not nofind:
         fname = ocropus_find_file(fname)
     if verbose:
-        print "# loading object",fname   
+        print "# loading object",fname
     if zip==0 and fname.endswith(".gz"):
         zip = 1
     if zip>0:
-        with gzip.GzipFile(fname,"rb") as stream:
+        # with gzip.GzipFile(fname,"rb") as stream:
+        with os.popen("gunzip < '%s'"%fname,"rb") as stream:
             unpickler = cPickle.Unpickler(stream)
             unpickler.find_global = unpickle_find_global
             return unpickler.load()
@@ -795,7 +797,7 @@ def quick_check_line_components(line_bin,dpi):
 
 def deprecated(func):
     """This is a decorator which can be used to mark functions
-    as deprecated. It will result in a warning being emmitted
+    as deprecated. It will result in a warning being emitted
     when the function is used."""
     def newFunc(*args, **kwargs):
         warnings.warn("Call to deprecated function %s." % func.__name__,
@@ -1052,3 +1054,16 @@ def remove_noise(line,minsize=8):
     sums = sums[labels]
     good = minimum(bin,1-(sums>0)*(sums<minsize))
     return good
+
+class MovingStats:
+    def __init__(self,n=100):
+        self.data = []
+        self.n = n
+        self.count = 0
+    def add(self,x):
+        self.data += [x]
+        self.data = self.data[-self.n:]
+        self.count += 1
+    def mean(self):
+        if len(self.data)==0: return nan
+        return mean(self.data)

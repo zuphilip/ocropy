@@ -289,7 +289,7 @@ except: pass
 def AFLOAT(a):
     return a.dtype in float_dtypes
 
-int_dtypes = [numpy.dtype('uint8'),numpy.dtype('int32'),numpy.dtype('int64'),numpy.dtype('uint32')]
+int_dtypes = [numpy.dtype('uint8'),numpy.dtype('int32'),numpy.dtype('int64'),numpy.dtype('uint32'),numpy.dtype('uint64')]
 
 @makeargcheck("array must contain integer values")
 def AINT(a):
@@ -374,13 +374,13 @@ RGBA = ALL(ARANK(3),ABYTE,CHANNELS(4))
 
 ### image arrays with more complicated image properties
 
-@makeargcheck("excpect a light image (median>mean)",warning=1)
+@makeargcheck("expect a light image (median>mean)",warning=1)
 def LIGHT(a):
     return numpy.median(a)>=numpy.mean(a)
-@makeargcheck("excpect a dark image (median<mean)",warning=1)
+@makeargcheck("expect a dark image (median<mean)",warning=1)
 def DARK(a):
     return numpy.median(a)<=numpy.mean(a)
-@makeargcheck("excpect a page image (larger than 600x600)",warning=1)
+@makeargcheck("expect a page image (larger than 600x600)",warning=1)
 def PAGE(a):
     return a.ndim==2 and a.shape[0]>=600 and a.shape[1]>=600
 @makeargcheck("expected a line image (taller than 8 pixels and wider than tall)",warning=1)

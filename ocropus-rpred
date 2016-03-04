@@ -1,5 +1,5 @@
-#!/usr/bin/python
-
+#!/usr/bin/env python
+from __future__ import print_function
 import traceback
 import codecs
 from pylab import *
@@ -55,14 +55,21 @@ parser.add_argument('-S','--save',default=None,
 parser.add_argument("-q","--quiet",action="store_true",
                     help="turn off most output")
 parser.add_argument("-Q","--parallel",type=int,default=1,
-                    help="number of parallel processes to use (%(default)s)")
+                    help="number of parallel processes to use, default: %(default)s")
 parser.add_argument('--probabilities', action='store_true',
                     help='Output probabilities for each letter')
+
 
 # input files
 parser.add_argument("files",nargs="+",
                     help="input files; glob and @ expansion performed")
 args = parser.parse_args()
+
+def print_info(*objs):
+    print("INFO: ", *objs, file=sys.stdout)
+
+def print_error(*objs):
+    print("ERROR: ", *objs, file=sys.stderr)
 
 def check_line(image):
     if len(image.shape)==3: return "input image is color image %s"%(image.shape,)
@@ -86,13 +93,13 @@ if len(args.files)<1:
     parser.print_help()
     sys.exit(0)
 
-print 
-print "#"*10,(" ".join(sys.argv))[:60]
-print 
+print_info("")
+print_info("#"*10,(" ".join(sys.argv))[:60])
+print_info("")
 
 
 inputs = ocrolib.glob_all(args.files)
-if not args.quiet: print "#inputs",len(inputs)
+if not args.quiet: print_info("#inputs"+ str(len(inputs)))
 
 # disable parallelism when anything is being displayed
 
@@ -103,12 +110,16 @@ if args.show>=0 or args.save is not None:
 
 try:
   network = ocrolib.load_object(args.model,verbose=1)
+  for x in network.walk(): x.postLoad()
+  for x in network.walk():
+      if isinstance(x,lstm.LSTM):
+          x.allocate(5000)
 except ocrolib.FileNotFound:
-  print
-  print "Cannot find OCR model file:",args.model
-  print "Download a model and put it into:",ocrolib.default.modeldir
-  print "(Or override the location with OCROPUS_DATA.)"
-  print
+  print_error("")
+  print_error("Cannot find OCR model file:" + args.model)
+  print_error("Download a model and put it into:" + ocrolib.default.modeldir)
+  print_error("(Or override the location with OCROPUS_DATA.)")
+  print_error("")
   sys.exit(1)
 
 # get the line normalizer from the loaded network, or optionally
@@ -132,8 +143,8 @@ def process1(arg):
     if not args.nocheck:
         check = check_line(amax(line)-line)
         if check is not None:
-            print fname,"SKIPPED",check,"(use -n to disable this check)"
-            return (0,[],0,trial,fname)            
+            print_error(fname+" SKIPPED "+check+" (use -n to disable this check)")
+            return (0,[],0,trial,fname)
 
     if not args.nolineest:
         assert "dew.png" not in fname,"don't dewarp dewarped images"
@@ -152,7 +163,7 @@ def process1(arg):
         result = lstm.translate_back(network.outputs,pos=1)
         scale = len(raw_line.T)*1.0/(len(network.outputs)-2*args.pad)
         #ion(); imshow(raw_line,cmap=cm.gray)
-        with codecs.open(base+".llocs","w") as locs:
+        with codecs.open(base+".llocs","w","utf-8") as locs:
             for r,c in result:
                 c = network.l2s([c])
                 r = (r-args.pad)*scale
@@ -168,7 +179,7 @@ def process1(arg):
             network.trainString(line,transcript,update=0)
             result = lstm.translate_back(network.aligned,pos=1)
             scale = len(raw_line.T)*1.0/(len(network.aligned)-2*args.pad)
-            with codecs.open(base+".alocs","w") as locs:
+            with codecs.open(base+".alocs","w","utf-8") as locs:
                 for r,c in result:
                     c = network.l2s([c])
                     r = (r-args.pad)*scale
@@ -200,12 +211,12 @@ def process1(arg):
             err = edist.xlevenshtein(pred0,gt0)
             conf = []
         if not args.quiet:
-            print "%3d %3d"%(err,len(gt)),fname,":",pred
+            print_info("%3d %3d"%(err,len(gt)) + " " + fname+":"+pred)
             sys.stdout.flush()
         return (err,conf,len(gt0),trial,fname)
 
     if not args.quiet:
-        print fname,":",pred
+        print_info(fname+":"+pred)
     ocrolib.write_text(base+".txt",pred)
 
     if args.show>0 or args.save is not None:
@@ -239,7 +250,7 @@ def process1(arg):
             draw()
             savename = args.save
             if "%" in savename: savename = savename%trial
-            print "saving",savename
+            print_info("saving "+savename)
             savefig(savename,bbox_inches=0)
         if trial==len(inputs)-1:
             ginput(1,99999999)
@@ -253,10 +264,10 @@ def safe_process1(arg):
         return process1(arg)
     except IOError as e:
         if ocrolib.trace: traceback.print_exc()
-        print fname,":",e
+        print_info(fname+":"+e)
     except ocrolib.OcropusException as e:
         if e.trace: traceback.print_exc()
-        print fname,":",e
+        print_info(fname+":"+e)
     except:
         traceback.print_exc()
         return None
@@ -288,8 +299,8 @@ if args.estrate:
         terr += err
         total += n
         confusions += conf
-    print "%.5f"%(terr*1.0/total),terr,total,args.model
+    print_info("%.5f"%(terr*1.0/total) + " " + terr+ " " + total + " " + args.model)
     if args.estconf>0:
-        print "top",args.estconf,"confusions (count pred gt), comparison:",args.compare
+        print_info("top " + args.estconf + " confusions (count pred gt), comparison: " + args.compare)
         for ((u,v),n) in Counter(confusions).most_common(args.estconf):
-            print "%6d %-4s %-4s"%(n,u,v)
+            print_info("%6d %-4s %-4s"%(n,u,v))
